@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use ChemFuncT or the Chemical Function Taxonomy in your research, please consider citing the associated publication."
+title: "ChemFuncT: Helper Utilities for the Chemical Functional Use Taxonomy"
+version: "1.0.2"
+repository-code: "https://github.com/carret1268/AMOS-ChemFuncT"
+doi: "10.1021/acs.jcim.5c01537"
+
+authors:
+  - family-names: "Carr"
+    given-names: "E. Tyler"
+  - family-names: "Janesch"
+    given-names: "Gregory"
+  - family-names: "Charest"
+    given-names: "Nathaniel"
+  - family-names: "Zurek-Ost"
+    given-names: "Michael"
+  - family-names: "Phillips"
+    given-names: "Katherine"
+  - family-names: "Isaacs"
+    given-names: "Kristin"
+  - family-names: "Williams"
+    given-names: "Antony J."
+
+preferred-citation:
+  type: article
+  title: "Curating and Visualizing the Analytical Methods and the Open Spectral Database’s Chemical Functional Use Taxonomy"
+  authors:
+    - family-names: "Carr"
+      given-names: "E. Tyler"
+    - family-names: "Janesch"
+      given-names: "Gregory"
+    - family-names: "Charest"
+      given-names: "Nathaniel"
+    - family-names: "Zurek-Ost"
+      given-names: "Michael"
+    - family-names: "Phillips"
+      given-names: "Katherine"
+    - family-names: "Isaacs"
+      given-names: "Kristin"
+    - family-names: "Williams"
+      given-names: "Antony J."
+  journal: "Journal of Chemical Information and Modeling"
+  year: 2025
+  doi: "10.1021/acs.jcim.5c01537"

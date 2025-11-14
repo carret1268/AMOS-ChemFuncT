@@ -3,7 +3,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/ChemFuncT.svg)](https://pypi.org/project/ChemFuncT/)
 [![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
 
-
 The Analytical Methods and Open Spectra (AMOS) Database's Chemical Function Taxonomy (ChemFuncT) contains mappings between chemicals (via name and DTXSID) and their functional uses. This repository contains a snapshot of the SQLite database and a Python class to help query the database.
 
 ## Sources
@@ -309,6 +308,15 @@ pip install -e
 ```
 
 This uses your local source files directly, so any changes you make are reflected immediately without reinstalling.
+
+## Citation
+
+The Chemical Function Taxonomy and its underlying database were described in:
+
+E. T. Carr et al. Curating and Visualizing the Analytical Methods and the Open Spectral Database’s Chemical Functional Use Taxonomy. Journal of Chemical Information and Modeling, 2025.  
+<https://doi.org/10.1021/acs.jcim.5c01537>
+
+Use of citation is not required (CC0 license), but is appreciated.
 
 ## License
 

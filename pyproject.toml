@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ChemFuncT"
-version = "1.0.1"
+version = "1.0.2"
 description = "Helper utilities for the Chemical Functional Use Taxonomy SQLite database."
 readme = "README.md"
 requires-python = ">=3.11"
