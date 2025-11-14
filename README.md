@@ -19,7 +19,7 @@ This dataset was compiled using information from:
 
 A snapshot of the data is contained in `data/ChemFuncT.db`. Here is an ER diagram representation of the database.
 
-![ChemFuncT ER Diagram](./resources/ER_diagram.png)
+![ChemFuncT ER Diagram](https://github.com/carret1268/AMOS-ChemFuncT/blob/main/resources/ER_diagram.png?raw=true)
 
 Descriptions of each table and their variables follow:
 
@@ -80,7 +80,7 @@ Descriptions of each table and their variables follow:
 
 For the ChemFuncT.ChemFuncTHelper class to work by default, you must use the following directory structure:
 
-![Expected directory structure](./resources/directory_tree.png)
+![Expected directory structure](https://github.com/carret1268/AMOS-ChemFuncT/blob/main/resources/directory_tree.png?raw=true)
 
 For more information about any given method and its parameters, check the respective docstring in the source code.
 
