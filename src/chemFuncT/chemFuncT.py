@@ -3,21 +3,27 @@
 E. Tyler Carr
 November 21, 2024
 """
+
+from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from sqlite_handler import SqliteHandler
+from .sqlite_handler import SqliteHandler
+
+ChemSource = Literal["wikipedia", "appril", "drugbank", "chemexpo"]
+VALID_SOURCES: set[ChemSource] = {"wikipedia", "appril", "drugbank", "chemexpo"}
+
 
 class ChemFuncTHelper(SqliteHandler):
     """Class representing a connection to the Functional Use Classification DB."""
-    
+
     def __init__(self, path: str | Path | None = None):
         """Constructor for ChemFuncTHelper objects.
-        
+
         Inherits from amos.src.sqlite_handler.SqliteHandler class.
-        
+
         Automatically instantiates a connection and cursor to the db.
-        
+
         Parameters
         ----------
         path : str | pathlib.Path | None, default None
@@ -25,7 +31,7 @@ class ChemFuncTHelper(SqliteHandler):
             class sqlite_handler.SqliteHandler attribute.
         """
         super().__init__()
-        
+
         if path is None:
             self.set_conn(self.chem_func_uses_path)
         else:
@@ -33,21 +39,23 @@ class ChemFuncTHelper(SqliteHandler):
                 raise ValueError(f"path must point to a .db file, not {path}")
             path = Path(str(path)).resolve()
             self.set_conn(path)
-    
-    def query_hierarchy_paths(self, as_str: bool = False) -> tuple[str, str] | tuple[list[str]]:
+
+    def query_hierarchy_paths(
+        self, as_str: bool = False
+    ) -> tuple[str, str] | tuple[list[str], list[str]]:
         """Returns a string of ' -> ' delimited paths for all hierarchy paths starting
         from root nodes on. The first str contains the classification_ids, the
-        second str contains the classification names.
-        
+        second str contains the classification names. Or it returns these in a list.
+
         Parameters
         ----------
-        as_str : bool, default True
-            If True, returns results in a ' -> ' delimited string 
+        as_str : bool, default False
+            If True, returns results in a ' -> ' delimited string
             (e.g., "Industrial Chemicals -> Additives -> Fillers")
             Else, returns an ordered list of the paths instead
             (e.g., ["Industrial Chemicals", "Additives", "Fillers"])
         """
-        
+
         ## Make query
         self.cursor.execute("""
             -- Recursive call to get parent/child relationships
@@ -68,7 +76,7 @@ class ChemFuncTHelper(SqliteHandler):
             SELECT Path
             FROM HierarchyPaths
             """)
-        
+
         ## Create the ordered lists
         paths = self.cursor.fetchall()
         class_name_paths = []
@@ -77,57 +85,98 @@ class ChemFuncTHelper(SqliteHandler):
             path = path[0]
             new_path = []
             for func_id in path.split(" -> "):
-                self.cursor.execute(f"SELECT classification FROM Classifications WHERE id = ?",
-                                    (func_id,))
+                self.cursor.execute(
+                    "SELECT classification FROM Classifications WHERE id = ?",
+                    (func_id,),
+                )
                 new_path.append(self.cursor.fetchone()[0])
             new_path = " -> ".join(new_path)
             class_name_paths.append(new_path)
             class_code_paths.append(path)
-        
+
         ## optionally convert to str
         if as_str:
             class_name_paths = " | ".join(class_name_paths)
             class_code_paths = " | ".join(class_code_paths)
-        
+
         return class_code_paths, class_name_paths
-    
+
     def get_chem_name(self, dtxsid: str) -> str:
         """Returns the preferred name of dtxsid"""
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
             SELECT name FROM Chemicals
-            WHERE dtxsid is ?;             
-            """, (dtxsid,))
-        
+            WHERE dtxsid = ?;             
+            """,
+            (dtxsid,),
+        )
+
         return self.cursor.fetchone()[0]
-        
+
     def get_class_id_from_name(self, name: str) -> str:
         """Returns the classification id that matches to name."""
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
                SELECT id FROM Classifications
-               WHERE classification is ?;             
-            """, (name,))
-        
+               WHERE classification = ?;             
+            """,
+            (name,),
+        )
+
         return self.cursor.fetchone()[0]
-    
+
     def get_class_name_from_id(self, func_id: str) -> str:
         """Returns the classification label from func_id."""
-        
-        self.cursor.execute("""
+
+        self.cursor.execute(
+            """
             SELECT classification FROM Classifications
-            WHERE id is ?;             
-            """, (func_id,))
-        
+            WHERE id = ?;             
+            """,
+            (func_id,),
+        )
+
         classification = self.cursor.fetchone()[0]
-        
+
         return classification
-        
-    def get_chem_classes(self, dtxsid: str, names: bool = True, only_direct_parent: bool = False, 
-                         sources: None | list[Literal["wikipedia", "appril", "drugbank", "chemexpo"]] = None, 
-                         as_str: bool = True) -> str | list[str]:
+
+    def get_chem_classes_batch(
+        self,
+        dtxsids: list[str],
+        names: bool = True,
+        only_direct_parent: bool = False,
+        sources: list[ChemSource] | None = None,
+        as_str: bool = True,
+    ) -> str | list[str]:
+        func_classes: set[str] = set()
+        for dtxsid in dtxsids:
+            func_classes.update(
+                self.get_chem_classes(
+                    dtxsid=dtxsid,
+                    names=names,
+                    only_direct_parent=only_direct_parent,
+                    sources=sources,
+                    as_str=False,
+                )
+            )
+
+        result = list(func_classes)
+        result.sort()
+
+        if not as_str:
+            return result
+        return "; ".join(result)
+
+    def get_chem_classes(
+        self,
+        dtxsid: str,
+        names: bool = True,
+        only_direct_parent: bool = False,
+        sources: list[ChemSource] | None = None,
+        as_str: bool = True,
+    ) -> str | list[str]:
         """Returns the unique classes for a given dtxsid.
-        
-        This method is horrendous, but it works.
-        
+
         Parameters
         ----------
         dtxsid : str
@@ -138,215 +187,245 @@ class ChemFuncTHelper(SqliteHandler):
             If True, only returns the direct parent classes of the chemical
             (ignores hierarchically implied classes).
             Else, parents ancestry tree will be followed to get all class memberships.
-        sources : None | list[literal["wikipedia", "appril", "drugbank", "chemexpo"]], default None
+        sources : None | list[Literal["wikipedia", "appril", "drugbank", "chemexpo"]], default None
             A list of sources to pull classifications from. If None, all sources are used.
         as_str : bool, default True
             If True, outputs a semicolon delimited str of classes (e.g., "Drugs; Pharmaceuticals")
             Else, outputs a list of classes (e.g., ["Drugs", "Pharmaceuticals"])
-        
+
         Returns
         -------
         str | list[str]
             The functional use classes of dtxsid (either the ids or the names).
         """
-        if type(sources) == list:
-            for source in sources:
-                if source.lower() not in ["wikipedia", "appril", "drugbank", "chemexpo"]:
-                    raise ValueError("Sources must be None or a list containing one or more of the following literals: 'wikipedia', 'appril', 'drugbank', 'chemexpo'.")
-        ## get the direct parent classification_ids
-        if sources == None:
-            self.cursor.execute("""
-                SELECT classification_id FROM ChemicalClassifications
-                WHERE dtxsid = ?                
-                """, (dtxsid,))
-        else:
-            placeholders = ', '.join('?' for _ in sources)
-            self.cursor.execute(f"""
-                SELECT classification_id FROM ChemicalClassifications
-                WHERE dtxsid = ?         
-                AND
-                source_id IN ({placeholders})       
-                """, (dtxsid, *sources))
-        direct_parent_ids = list(set([parent_id[0] for parent_id in self.cursor.fetchall()]))
-        
-        ## if just looking for direct parents, we can return now
-        if ((not names) and only_direct_parent):
-            if as_str:
-                direct_parent_ids = "; ".join(direct_parent_ids)
-                
-            return direct_parent_ids
-        elif only_direct_parent:
-            direct_parent_names = set()
-            for direct_parent_id in direct_parent_ids:
-                direct_parent_name = self.get_class_name_from_id(direct_parent_id)
-                direct_parent_names.add(direct_parent_name)
-            
-            direct_parent_names = list(direct_parent_names)
-            direct_parent_names.sort()
-            
-            if as_str:
-                direct_parent_names = "; ".join(direct_parent_names)
-            
-            return direct_parent_names
-        
-        ## get the parent's parents recursively
-        ancestry_ids = set()
-        for parent_id in direct_parent_ids:
-            self.cursor.execute("""
-                WITH RECURSIVE HierarchyAncestry AS (
-                    -- start ancestry with direct parent node
-                    SELECT parent_id, child_id, child_id AS Ancestry
-                    FROM ClassificationHierarchy
-                    WHERE child_id IS ?
-                    
-                    UNION ALL
-                    
-                    -- for each ancestor, append the ancestry
-                    SELECT h.parent_id, h.child_id, Ancestry ||' -> '|| h.parent_id
-                    FROM ClassificationHierarchy h
-                    JOIN HierarchyAncestry ha ON ((h.child_id = ha.parent_id) AND (h.parent_id IS NOT NULL))
+
+        # --- small local helpers -------------------------------------------------
+        def _normalize_sources(
+            srcs: None | list[ChemSource],
+        ) -> None | list[str]:
+            if srcs is None:
+                return None
+
+            if not isinstance(srcs, list):
+                raise TypeError(
+                    "sources must be None or a list of "
+                    "['wikipedia', 'appril', 'drugbank', 'chemexpo']"
                 )
-                SELECT Ancestry
-                FROM HierarchyAncestry;
-                """, (parent_id,))
-            
-            ancestry_strs = [path[0] for path in self.cursor.fetchall()]
-            for path in ancestry_strs:
-                for p in path.split(" -> "):
-                    ancestry_ids.add(p)
-                    
-        ancestry_ids = list(ancestry_ids)
-        ancestry_ids.sort()
-        
-        if not names:
-            if as_str:
-                ancestry_ids = "; ".join(ancestry_ids)
-            return ancestry_ids
-        
-        ## get the names
-        ancestry_names = set()
-        for ancestry_id in ancestry_ids:
-            ancestry_name = self.get_class_name_from_id(ancestry_id)
-            ancestry_names.add(ancestry_name)
-            
-        ancestry_names = list(ancestry_names)
-        ancestry_names.sort()
-            
-        if not names:
-            if as_str:
-                ancestry_ids = "; ".join(ancestry_ids)
-                
-            return ancestry_ids
+
+            lowered = [s.lower() for s in srcs]
+            unknown = set(lowered) - VALID_SOURCES
+            if unknown:
+                raise ValueError(
+                    "Sources must be None or a list containing one or more of: "
+                    "'wikipedia', 'appril', 'drugbank', 'chemexpo'. "
+                    f"Got invalid values: {sorted(unknown)!r}"
+                )
+            return lowered
+
+        def _maybe_join(values: list[str]) -> str | list[str]:
+            return "; ".join(values) if as_str else values
+
+        def _ids_to_names(ids: list[str]) -> list[str]:
+            names_set: set[str] = set()
+            for cid in ids:
+                names_set.add(self.get_class_name_from_id(cid))
+            return sorted(names_set)
+
+        # One CTE text for ancestry, reused in loop
+        ANCESTRY_SQL = """
+            WITH RECURSIVE HierarchyAncestry AS (
+                -- start ancestry with direct parent node
+                SELECT parent_id, child_id, child_id AS Ancestry
+                FROM ClassificationHierarchy
+                WHERE child_id = ?
+
+                UNION ALL
+
+                -- for each ancestor, append the ancestry
+                SELECT h.parent_id, h.child_id, ha.Ancestry || ' -> ' || h.parent_id
+                FROM ClassificationHierarchy h
+                JOIN HierarchyAncestry ha
+                ON h.child_id = ha.parent_id
+                AND h.parent_id IS NOT NULL
+            )
+            SELECT Ancestry
+            FROM HierarchyAncestry;
+        """
+
+        # --- 1. Validate / normalize sources -------------------------------------
+        sources_norm = _normalize_sources(sources)
+
+        # --- 2. Get direct parent classification IDs -----------------------------
+        if sources_norm is None:
+            self.cursor.execute(
+                """
+                SELECT classification_id
+                FROM ChemicalClassifications
+                WHERE dtxsid = ?
+                """,
+                (dtxsid,),
+            )
         else:
-            if as_str:
-                ancestry_names = "; ".join(ancestry_names)
-                
-            return ancestry_names
-    
+            placeholders = ", ".join("?" for _ in sources_norm)
+            self.cursor.execute(
+                f"""
+                SELECT classification_id
+                FROM ChemicalClassifications
+                WHERE dtxsid = ?
+                AND source_id IN ({placeholders})
+                """,
+                (dtxsid, *sources_norm),
+            )
+
+        direct_parent_ids = sorted({row[0] for row in self.cursor.fetchall()})
+
+        # --- 3. If only direct parents are requested, return them and bail -------
+        if only_direct_parent:
+            if not names:
+                return _maybe_join(direct_parent_ids)
+            parent_names = _ids_to_names(direct_parent_ids)
+            return _maybe_join(parent_names)
+
+        # --- 4. Build ancestry ID set via recursive CTE --------------------------
+        ancestry_ids: set[str] = set(direct_parent_ids)
+
+        for parent_id in direct_parent_ids:
+            self.cursor.execute(ANCESTRY_SQL, (parent_id,))
+            for (path,) in self.cursor.fetchall():
+                for cid in path.split(" -> "):
+                    ancestry_ids.add(cid)
+
+        ancestry_ids_list = sorted(ancestry_ids)
+
+        # --- 5. IDs vs names, list vs string -------------------------------------
+        if not names:
+            return _maybe_join(ancestry_ids_list)
+
+        ancestry_names = _ids_to_names(ancestry_ids_list)
+        return _maybe_join(ancestry_names)
+
     def get_class_parents(self, node: str, names: bool = True) -> list[str]:
         """Returns a list of parents to the node class.
-        
+
         Parameters
         ----------
         node : str
             The name of the class of interest. Can be the class id,
-            or class name -- class_id always starts with func_, so 
+            or class name -- class_id always starts with func_, so
             it is easy to parse.
         names : bool, default True
             If True, outputs the names of classes. Else outputs the func_ids.
-            
+
         Returns
         -------
         list[str]
             The list of parents of the functional use class node.
         """
         if node.startswith("func_"):
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT parent_id FROM ClassificationHierarchy
-                WHERE ((child_id is ?) AND (parent_id IS NOT NULL));               
-                """, (node,))    
+                WHERE ((child_id = ?) AND (parent_id IS NOT NULL));               
+                """,
+                (node,),
+            )
         else:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT parent_id FROM ClassificationHierarchy
                 WHERE child_id = (
                     SELECT id FROM Classifications
                     WHERE classification = ?
                 );
-                """, (node,))
-        
+                """,
+                (node,),
+            )
+
         parents = set()
         for row in self.cursor.fetchall():
             parents.add(row[0])
-            
+
         parents = list(parents)
-        
+
         if names:
             new_parents = set()
             for parent_id in parents:
-                self.cursor.execute("""
+                self.cursor.execute(
+                    """
                     SELECT classification FROM Classifications
                     WHERE id = ?;                
-                    """, (parent_id,))
+                    """,
+                    (parent_id,),
+                )
                 new_parents.add(self.cursor.fetchone()[0])
-            
+
             parents = list(new_parents)
-            
+
         parents.sort()
-        
+
         return parents
-    
+
     def get_class_children(self, node: str, names: bool = True) -> list[str]:
         """Returns a list of children to the node class.
-        
+
         Parameters
         ----------
         node : str
             The name of the class of interest. Can be the class id,
-            or class name -- class_id always starts with func_, so 
+            or class name -- class_id always starts with func_, so
             it is easy to parse.
         names : bool, default True
             If True, outputs the names of classes. Else outputs the func_ids.
-            
+
         Returns
         -------
         list[str]
             The list of children of the functional use class node.
         """
         if node.startswith("func_"):
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT child_id FROM ClassificationHierarchy
-                WHERE ((parent_id is ?) AND (child_id IS NOT NULL));               
-                """, (node,))    
+                WHERE ((parent_id = ?) AND (child_id IS NOT NULL));               
+                """,
+                (node,),
+            )
         else:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT child_id FROM ClassificationHierarchy
                 WHERE parent_id = (
                     SELECT id FROM Classifications
                     WHERE classification = ?
                 );
-                """, (node,))
-        
-        parents = set()
+                """,
+                (node,),
+            )
+
+        children = set()
         for row in self.cursor.fetchall():
-            parents.add(row[0])
-            
-        parents = list(parents)
-        
+            children.add(row[0])
+
+        children = list(children)
+
         if names:
-            new_parents = set()
-            for parent_id in parents:
-                self.cursor.execute("""
+            new_children = set()
+            for child_id in children:
+                self.cursor.execute(
+                    """
                     SELECT classification FROM Classifications
                     WHERE id = ?;                
-                    """, (parent_id,))
-                new_parents.add(self.cursor.fetchone()[0])
-            
-            parents = list(new_parents)
-            
-        parents.sort()
-        
-        return parents
-    
+                    """,
+                    (child_id,),
+                )
+                new_children.add(self.cursor.fetchone()[0])
+
+            children = list(new_children)
+
+        children.sort()
+
+        return children
+
     def export_db_to_excel(self, output_path: str | Path) -> None:
         """Exports the entire database to an Excel file with one worksheet per table.
 
@@ -363,9 +442,11 @@ class ChemFuncTHelper(SqliteHandler):
                 "The 'openpyxl' library is required for this method. "
                 "Please install it using 'pip install openpyxl'."
             )
-        
+
         if not self.conn:
-            raise ValueError("No active database connection. Please set a connection first.")
+            raise ValueError(
+                "No active database connection. Please set a connection first."
+            )
 
         ## Create a new Excel workbook
         workbook = Workbook()
@@ -374,7 +455,7 @@ class ChemFuncTHelper(SqliteHandler):
 
         ## setup alignment and font objects for header formatting
         bold_font = Font(bold=True)
-        center_alignment = Alignment(horizontal="center", vertical="center") 
+        center_alignment = Alignment(horizontal="center", vertical="center")
 
         ## Get all table names in the database
         self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -393,7 +474,7 @@ class ChemFuncTHelper(SqliteHandler):
 
             ## Write column headers to the worksheet
             worksheet.append(column_names)
-            
+
             ## Apply formatting to headers
             for column_i, column_name in enumerate(column_names, start=1):
                 cell = worksheet.cell(row=1, column=column_i)
@@ -403,7 +484,7 @@ class ChemFuncTHelper(SqliteHandler):
             ## Write rows to the worksheet
             for row in rows:
                 worksheet.append(row)
-                
+
             ## Adjust column widths
             for column_i, column_name in enumerate(column_names, start=1):
                 max_length = len(column_name)  # Start with the header length
@@ -413,10 +494,13 @@ class ChemFuncTHelper(SqliteHandler):
                     except IndexError:
                         pass
                 adjusted_width = max_length + 2  # Add some padding
-                worksheet.column_dimensions[chr(64 + column_i)].width = min(adjusted_width, 110)
+                worksheet.column_dimensions[chr(64 + column_i)].width = min(
+                    adjusted_width, 110
+                )
 
         ## Save the workbook to the specified output path
         workbook.save(output_path)
 
+
 if __name__ == "__main__":
-    pass    
+    pass

@@ -1,3 +1,7 @@
-src/__pycache__/
+**/__pycache__/
 AMOS-Chemical_Functional_Use_Taxonomy-DRAFT.docx
 src/HierarchyHelper.py
+.ruff_cache/
+.venv/
+dist/
+**/*.egg-info

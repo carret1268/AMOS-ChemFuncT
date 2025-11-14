@@ -1,6 +1,19 @@
 # Chemical Function Taxonomy (ChemFuncT)
 
+[![PyPI version](https://img.shields.io/pypi/v/ChemFuncT.svg)](https://pypi.org/project/ChemFuncT/)
+[![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
+
+
 The Analytical Methods and Open Spectra (AMOS) Database's Chemical Function Taxonomy (ChemFuncT) contains mappings between chemicals (via name and DTXSID) and their functional uses. This repository contains a snapshot of the SQLite database and a Python class to help query the database.
+
+## Sources
+
+This dataset was compiled using information from:
+
+- Wikipedia – General-purpose encyclopedia entries on chemical uses.
+- [ChemExpo](https://comptox.epa.gov/chemexpo/) – A web application that surfaces reported chemical function use from the EPA's CPDat database.
+- [DrugBank](https://go.drugbank.com/) – Pharmaceutical chemical uses and mechanisms.
+- [APPRIL](https://ordspub.epa.gov/ords/pesticides/f?p=APPRIL_PUBLIC:2::::::) – The EPA's Active Pesticide Product Registration Informational Listing.
 
 ## ChemFuncT Database
 
@@ -76,7 +89,7 @@ For more information about any given method and its parameters, check the respec
 If using the recommended directory structure, the path to ChemFuncT.db is correctly set within the `sqlite_handler.SqliteHandler.chem_func_uses_path` attribute such that instantiating an instance of `ChemFuncT.ChemFuncTHelper` will automatically connect to the database and set the resulting `sqlite3.Connection` and `sqlite3.Cursor` objects to the `ChemFuncT.ChemFuncTHelper.conn` and `ChemFuncT.ChemFuncTHelper.cursor` attributes, respectively.
 
 ```python
-from ChemFuncT import ChemFuncTHelper
+from chemFuncT import ChemFuncTHelper
 
 FuncDB = ChemFuncTHelper()
 ```
@@ -236,7 +249,17 @@ print(atrazine_classes)
 
 > ['func_0005', 'func_0087', 'func_0153', 'func_0181', 'func_0189', 'func_0227', 'func_0269']
 
-#### ChemFuncTHelper.get_class_parents
+### ChemFuncTHelper.get_chem_classes_batch()
+
+This function is a wrapper for `ChemFunctHelper.get_chem_classes()` that allows you to return the functional use classes for a list of DTXSIDs.
+
+```python
+FuncDB = ChemFuncTHelper()
+dtxsids = ["DTXSID9020112", "DTXSID2020006"]
+batch_classes = FuncDB.get_chem_classes(dtxsids)
+```
+
+#### ChemFuncTHelper.get_class_parents()
 
 Returns the direct parents of a given class (accepts either class name or class id).
 
@@ -270,3 +293,24 @@ This method generates a data dump of `ChemFuncT.db` in the form of a `.xlsx` fil
 FuncDB = ChemFuncTHelper()
 FuncDB.export_db_to_excel("./path/to/ChemFuncT_datadump.xlsx")
 ```
+
+## Installation
+
+### Option 1 - install from PyPI
+
+`pip install ChemFuncT`
+
+### Option 2 - install from source
+
+```bash
+git clone https://github.com/carret1268/AMOS-ChemFuncT.git
+cd AMOS-ChemFuncT
+pip install -e
+```
+
+This uses your local source files directly, so any changes you make are reflected immediately without reinstalling.
+
+## License
+
+[![CC0](https://licensebuttons.net/p/zero/1.0/88x31.png)](https://creativecommons.org/publicdomain/zero/1.0/)
+This project is released under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
